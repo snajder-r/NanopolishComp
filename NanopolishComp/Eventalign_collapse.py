@@ -11,6 +11,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
 # Standard library imports
+from typing import List
 import multiprocessing as mp
 from time import time
 from collections import *
@@ -35,7 +36,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 class Eventalign_collapse ():
 
     def __init__ (self,
-        input_fn:"str",
+        input_fns: List[str],
         outdir:"str"="./",
         outprefix:"str"="out",
         max_reads:"int"=None,
@@ -95,8 +96,9 @@ class Eventalign_collapse ():
         self.log.info ("Checking arguments")
         # Try to read input file if not a stream
         self.log.debug("\tTesting input file readability")
-        if input_fn != 0 and not file_readable (input_fn):
-            raise IOError ("Cannot read input file")
+        for input_fn in input_fns:
+            if input_fn != 0 and not file_readable (input_fn):
+                raise IOError ("Cannot read input file %s" % input_fn)
         # Try to create output folder
         self.log.debug("\tCreating output folder")
         mkdir(outdir, exist_ok=True)
@@ -112,7 +114,7 @@ class Eventalign_collapse ():
         # Save args to self values
         self.outdir = outdir
         self.outprefix = outprefix
-        self.input_fn = input_fn
+        self.input_fns = input_fns
         self.threads = threads-2 # Remove 2 threads for read and write
         self.max_reads = max_reads
         self.write_samples = write_samples
@@ -162,44 +164,48 @@ class Eventalign_collapse ():
         self.log.debug("\t[split_reads] Start reading input file/stream")
         try:
             # Open input file or stdin if 0
-            with open (self.input_fn) as fp:
 
-                # Get header line and extract corresponding index
-                input_header = fp.readline().rstrip().split("\t")
-                if not input_header:
-                    raise NanopolishCompError ("Input file/stream is empty")
+            # First data line exception
+            n_reads = 0
+            read_l = []
+            event_l = None
 
-                idx = self._get_field_idx (input_header)
-                n_reads = 0
+            for input_fn in self.input_fns:
+                with open (input_fn) as fp:
 
-                # First data line exception
-                read_l = []
-                event_l = fp.readline().rstrip().split("\t")
-                cur_read_id = event_l[idx["read_id"]]
-                cur_ref_id = event_l[idx["ref_id"]]
-                event_d = self._event_list_to_dict (event_l, idx)
-                read_l.append (event_d)
+                    # Get header line and extract corresponding index
+                    input_header = fp.readline().rstrip().split("\t")
+                    if not input_header:
+                        raise NanopolishCompError ("Input file/stream is empty")
 
-                for line in fp:
-                    # Early ending if required
-                    if self.max_reads and n_reads == self.max_reads:
-                        break
-                    # Get event line
-                    event_l = line.rstrip().split("\t")
-                    read_id = event_l[idx["read_id"]]
-                    ref_id = event_l[idx["ref_id"]]
-                    event_d = self._event_list_to_dict (event_l, idx)
+                    if event_l is None:
+                        idx = self._get_field_idx(input_header)
+                        event_l = fp.readline().rstrip().split("\t")
+                        cur_read_id = event_l[idx["read_id"]]
+                        cur_ref_id = event_l[idx["ref_id"]]
+                        event_d = self._event_list_to_dict (event_l, idx)
+                        read_l.append (event_d)
 
-                    # Line correspond to the same ids
-                    if read_id != cur_read_id or ref_id != cur_ref_id:
-                        in_q.put ((cur_read_id, cur_ref_id, read_l))
-                        n_reads+=1
-                        read_l = []
-                        cur_read_id = read_id
-                        cur_ref_id = ref_id
+                    for line in fp:
+                        # Early ending if required
+                        if self.max_reads and n_reads == self.max_reads:
+                            break
+                        # Get event line
+                        event_l = line.rstrip().split("\t")
+                        read_id = event_l[idx["read_id"]]
+                        ref_id = event_l[idx["ref_id"]]
+                        event_d = self._event_list_to_dict (event_l, idx)
 
-                    # In any case extend list corresponding to current read_id/ref_id
-                    read_l.append(event_d)
+                        # Line correspond to the same ids
+                        if read_id != cur_read_id or ref_id != cur_ref_id:
+                            in_q.put ((cur_read_id, cur_ref_id, read_l))
+                            n_reads+=1
+                            read_l = []
+                            cur_read_id = read_id
+                            cur_ref_id = ref_id
+
+                        # In any case extend list corresponding to current read_id/ref_id
+                        read_l.append(event_d)
 
                 # Last data line exception
                 in_q.put ((cur_read_id, cur_ref_id, read_l))

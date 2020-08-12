@@ -29,7 +29,7 @@ def main(args=None):
     subparser_ec = subparsers.add_parser("Eventalign_collapse", description="Collapse the nanopolish eventalign output at kmers level and compute kmer level statistics")
     subparser_ec.set_defaults(func=Eventalign_collapse_main)
     subparser_ec_io = subparser_ec.add_argument_group("Input/Output options")
-    subparser_ec_io.add_argument("-i", "--input_fn", default=0, help="Path to a nanopolish eventalign tsv output file. If '0' read from std input (default: %(default)s)")
+    subparser_ec_io.add_argument("-i", "--input_fn", default=0, nargs='+', help="Path to a nanopolish eventalign tsv output files. If '0' read from std input (default: %(default)s)")
     subparser_ec_io.add_argument("-o", "--outdir", type=str, default="./", help="Path to the output folder (will be created if it does exist yet) (default: %(default)s)")
     subparser_ec_io.add_argument("-p", "--outprefix", type=str, default="out", help="text outprefix for all the files generated (default: %(default)s)")
     subparser_ec_rp = subparser_ec.add_argument_group("Run parameters options")
@@ -70,7 +70,7 @@ def Eventalign_collapse_main (args):
     """"""
     # Run corresponding class
     Eventalign_collapse (
-        input_fn = args.input_fn,
+        input_fns = args.input_fn,
         outdir = args.outdir,
         outprefix = args.outprefix,
         write_samples = args.write_samples,
