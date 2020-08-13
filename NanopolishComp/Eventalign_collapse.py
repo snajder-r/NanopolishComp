@@ -96,6 +96,10 @@ class Eventalign_collapse ():
         self.log.info ("Checking arguments")
         # Try to read input file if not a stream
         self.log.debug("\tTesting input file readability")
+        # Since input_fns has been changed to support multiple files, this keeps
+        # compatibility with providing a single "0" for stdin
+        if input_fns == 0:
+            input_fns = [0]
         for input_fn in input_fns:
             if input_fn != 0 and not file_readable (input_fn):
                 raise IOError ("Cannot read input file %s" % input_fn)
@@ -162,8 +166,13 @@ class Eventalign_collapse ():
         Mono-threaded reader
         """
         self.log.debug("\t[split_reads] Start reading input file/stream")
+
+        class MaxReadsException(Exception):
+            pass
+
         try:
             # Open input file or stdin if 0
+
 
             # First data line exception
             n_reads = 0
@@ -189,7 +198,7 @@ class Eventalign_collapse ():
                     for line in fp:
                         # Early ending if required
                         if self.max_reads and n_reads == self.max_reads:
-                            break
+                            raise MaxReadsException
                         # Get event line
                         event_l = line.rstrip().split("\t")
                         read_id = event_l[idx["read_id"]]
@@ -212,6 +221,8 @@ class Eventalign_collapse ():
                 n_reads+=1
 
         # Manage exceptions and deal poison pills
+        except MaxReadsException:
+            self.log.debug("\t[split_reads] Maximum number of reads (%d) read. Skipping remaining reads." % self.max_reads)
         except Exception:
             error_q.put (NanopolishCompError(traceback.format_exc()))
         finally:
