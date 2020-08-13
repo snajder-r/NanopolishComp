@@ -77,7 +77,8 @@ def Eventalign_collapse_main (args):
         stat_fields= args.stat_fields,
         threads = args.threads,
         verbose = args.verbose,
-        quiet = args.quiet)
+        quiet = args.quiet,
+        max_reads = args.max_reads)
 
 def Freq_meth_calculate_main (args):
     """"""
